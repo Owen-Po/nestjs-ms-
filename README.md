@@ -136,3 +136,6 @@ app.useGlobalPipes(
   output   = "../generated/prisma"
   moduleFormat = "cjs"
 }"
+- cuarto cofnigruamos el env. con el url de prisma , despues creamos el modelo que esta en su libreira .
+- quinto creamos un modal que esta tambien el la libreria nest y despues de implementar el model instalaremos la migracion  
+'npx prisma migrate dev --name init'  
