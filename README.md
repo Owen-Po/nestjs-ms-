@@ -116,3 +116,12 @@ app.useGlobalPipes(
     forbidNonWhitelisted: true,
   }),
 );
+
+## una vez modificado todo
+
+-Comenzaremos con variables de entorno ('.env')
+
+- Primero vamos a crear la carpeta 'config' en el src despues creamos el archivo 'envs.ts'
+- segundo fuera del proyecto creamos nuestro .env , escribimos el port , desspues creamos otro de ejemplo
+- tercero ahora vamos a instalar el 'npm i dotenv joi'
+-
