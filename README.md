@@ -124,4 +124,15 @@ app.useGlobalPipes(
 - Primero vamos a crear la carpeta 'config' en el src despues creamos el archivo 'envs.ts'
 - segundo fuera del proyecto creamos nuestro .env , escribimos el port , desspues creamos otro de ejemplo
 - tercero ahora vamos a instalar el 'npm i dotenv joi'
--
+- cuarto configuramos el archivo envs.ts , despues en main.ts cambiamos el puerto por el envs.ts
+
+## Terminando de modificar las variables de entorno vamos al siguiente paso
+
+- Usaremos 'Prisma' con sql lite ( npm install prisma --save-dev)
+- segundo vamos con prisma ('npx prisma init)
+- Tercero modificamos el archivo schema.prims incorporando :
+  " generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+  moduleFormat = "cjs"
+}"
