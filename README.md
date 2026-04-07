@@ -569,3 +569,287 @@ async findAll(paginationDto: PaginationDto) {
    ```
 
    El producto eliminado no aparece en la lista.
+
+
+### Paso 12 - Transformar a microservicio con TCP
+
+Hasta ahora nuestra aplicación funciona como una API REST normal (HTTP). Ahora la vamos a convertir en un **microservicio** que se comunica por **TCP** en lugar de HTTP. Esto permite que otros microservicios se conecten a él directamente, sin pasar por HTTP.
+
+#### 12.1 - Instalar la dependencia de microservicios
+
+```bash
+npm install @nestjs/microservices
+```
+
+#### 12.2 - Modificar `main.ts`
+
+Reemplazamos `NestFactory.create()` por `NestFactory.createMicroservice()` y configuramos el transporte TCP:
+
+```ts
+// src/main.ts
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module';
+import { Logger, ValidationPipe } from '@nestjs/common';
+import { envs } from './config';
+import { MicroserviceOptions, Transport } from '@nestjs/microservices';
+
+async function bootstrap() {
+  const logger = new Logger('Main');
+  const app = await NestFactory.createMicroservice<MicroserviceOptions>(
+    AppModule,
+    {
+      transport: Transport.TCP,
+      options: {
+        port: envs.port,
+      },
+    },
+  );
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  );
+  await app.listen();
+  logger.log(`Products microservice running on port ${envs.port}`);
+}
+bootstrap();
+```
+
+**Cambios clave:**
+
+- `NestFactory.createMicroservice` en lugar de `NestFactory.create` — esto crea un microservicio en vez de un servidor HTTP.
+- `Transport.TCP` — usamos TCP como protocolo de comunicación. Es más ligero que HTTP y está diseñado para comunicación interna entre servicios.
+- `AppModule` va como **primer argumento** y las opciones de transporte como **segundo argumento**.
+- Importamos `Transport` desde `@nestjs/microservices` (es un enum con las opciones de transporte disponibles: TCP, Redis, NATS, etc.).
+- `Logger` se importa desde `@nestjs/common` y se instancia manualmente para poder loguear mensajes con un contexto (`'Main'`).
+- `app.listen()` sin puerto — en un microservicio, el puerto ya se configuró en las opciones de transporte.
+
+#### 12.3 - Cambiar decoradores en el controlador
+
+En un microservicio, los decoradores HTTP (`@Get`, `@Post`, `@Patch`, `@Delete`) ya **no funcionan**. Debemos reemplazarlos por decoradores de mensajes:
+
+| HTTP (REST)         | Microservicio            |
+|---------------------|--------------------------|
+| `@Get()`            | `@MessagePattern()`      |
+| `@Post()`           | `@MessagePattern()`      |
+| `@Patch()`          | `@MessagePattern()`      |
+| `@Delete()`         | `@MessagePattern()`      |
+| `@Body()`           | `@Payload()`             |
+| `@Param()`          | (viene dentro del payload)|
+| `@Query()`          | (viene dentro del payload)|
+
+Ejemplo de cómo queda el controlador:
+
+```ts
+// src/products/products.controller.ts
+import { Controller } from '@nestjs/common';
+import { MessagePattern, Payload } from '@nestjs/microservices';
+import { ProductsService } from './products.service';
+import { CreateProductDto } from './dto/create-product.dto';
+import { UpdateProductDto } from './dto/update-product.dto';
+import { PaginationDto } from 'src/common';
+
+@Controller('products')
+export class ProductsController {
+  constructor(private readonly productsService: ProductsService) {}
+
+  @MessagePattern({ cmd: 'create_product' })
+  create(@Payload() createProductDto: CreateProductDto) {
+    return this.productsService.create(createProductDto);
+  }
+
+  @MessagePattern({ cmd: 'find_all_products' })
+  findAll(@Payload() paginationDto: PaginationDto) {
+    return this.productsService.findAll(paginationDto);
+  }
+
+  @MessagePattern({ cmd: 'find_one_product' })
+  findOne(@Payload('id') id: number) {
+    return this.productsService.findOne(id);
+  }
+
+  @MessagePattern({ cmd: 'update_product' })
+  update(@Payload() updateProductDto: UpdateProductDto) {
+    return this.productsService.update(updateProductDto.id, updateProductDto);
+  }
+
+  @MessagePattern({ cmd: 'delete_product' })
+  remove(@Payload('id') id: number) {
+    return this.productsService.remove(id);
+  }
+}
+```
+
+**Explicación:**
+
+- `@MessagePattern({ cmd: 'create_product' })` — define el "comando" que este método escucha. Cuando otro servicio envíe un mensaje con `{ cmd: 'create_product' }`, este método lo procesará.
+- `@Payload()` — reemplaza a `@Body()`. Extrae los datos del mensaje recibido.
+- `@Payload('id')` — extrae un campo específico del payload, similar a como `@Param('id')` extraía del URL.
+- Ya no usamos `ParseIntPipe` porque los datos llegan como objetos (no como strings de URL).
+- En `update`, el `id` ahora viene dentro del DTO, por eso accedemos a `updateProductDto.id`.
+
+#### 12.4 - Agregar `id` al `UpdateProductDto`
+
+Como ya no recibimos el `id` desde la URL (`@Param`), necesitamos que venga dentro del body:
+
+```ts
+// src/products/dto/update-product.dto.ts
+import { PartialType } from '@nestjs/mapped-types';
+import { CreateProductDto } from './create-product.dto';
+import { IsPositive } from 'class-validator';
+
+export class UpdateProductDto extends PartialType(CreateProductDto) {
+  @IsPositive()
+  id: number;
+}
+```
+
+#### 12.5 - ¿Cómo se comunican los microservicios?
+
+Ahora este servicio **no se puede llamar desde el navegador o Postman** directamente, porque ya no es HTTP. Para comunicarte con él necesitas un **API Gateway** u otro microservicio que actúe como cliente TCP:
+
+```
+Cliente (navegador/app)
+    ↓  HTTP
+API Gateway (NestJS con @nestjs/microservices ClientProxy)
+    ↓  TCP
+Products Microservice (este proyecto)
+```
+
+El Gateway envía mensajes así:
+
+```ts
+// Desde el API Gateway
+this.client.send({ cmd: 'find_all_products' }, { page: 1, limit: 10 });
+```
+
+Y el microservicio de productos recibe ese mensaje en el método decorado con `@MessagePattern({ cmd: 'find_all_products' })`.
+
+---
+
+### Paso 13 - Payloads del microservicio (cómo usar cada comando)
+
+Al ser un microservicio TCP, los datos se envían como payloads desde el API Gateway usando `client.send()`. Aquí están todos los comandos disponibles y sus payloads:
+
+#### 13.1 - Crear producto
+
+```ts
+// Comando
+client.send({ cmd: 'create_product' }, payload);
+```
+
+**Payload:**
+
+| Campo  | Tipo     | Requerido | Validación                          |
+|--------|----------|-----------|-------------------------------------|
+| `name` | `string` | ✅ Sí     | Debe ser un string                  |
+| `price`| `number` | ✅ Sí     | Mínimo 0, máximo 4 decimales        |
+
+**Ejemplo:**
+
+```json
+{
+  "name": "Laptop Gaming",
+  "price": 1299.99
+}
+```
+
+#### 13.2 - Listar productos (con paginación)
+
+```ts
+// Comando
+client.send({ cmd: 'find_all_products' }, payload);
+```
+
+**Payload:**
+
+| Campo   | Tipo     | Requerido | Default | Validación         |
+|---------|----------|-----------|---------|--------------------|
+| `page`  | `number` | ❌ No     | `1`     | Debe ser positivo  |
+| `limit` | `number` | ❌ No     | `10`    | Debe ser positivo  |
+
+**Ejemplo:**
+
+```json
+{
+  "page": 2,
+  "limit": 5
+}
+```
+
+**Respuesta:**
+
+```json
+{
+  "data": [{ "id": 6, "name": "Mouse", "price": 25.00, "available": true, ... }],
+  "meta": { "total": 12, "page": 2, "lastPage": 3 }
+}
+```
+
+#### 13.3 - Obtener producto por ID
+
+```ts
+// Comando
+client.send({ cmd: 'find_one_products' }, { id: 1 });
+```
+
+**Payload:**
+
+| Campo | Tipo     | Requerido | Validación              |
+|-------|----------|-----------|-------------------------|
+| `id`  | `number` | ✅ Sí     | Debe ser un número entero|
+
+**Ejemplo:**
+
+```json
+{ "id": 1 }
+```
+
+#### 13.4 - Actualizar producto
+
+```ts
+// Comando
+client.send({ cmd: 'update_product' }, payload);
+```
+
+**Payload:**
+
+| Campo  | Tipo     | Requerido | Validación                          |
+|--------|----------|-----------|-------------------------------------|
+| `id`   | `number` | ✅ Sí     | Debe ser positivo                   |
+| `name` | `string` | ❌ No     | Debe ser un string                  |
+| `price`| `number` | ❌ No     | Mínimo 0, máximo 4 decimales        |
+
+> Al menos un campo además de `id` debe enviarse para que la actualización tenga sentido.
+
+**Ejemplo:**
+
+```json
+{
+  "id": 1,
+  "price": 899.99
+}
+```
+
+#### 13.5 - Eliminar producto (soft delete)
+
+```ts
+// Comando
+client.send({ cmd: 'delete_product' }, { id: 1 });
+```
+
+**Payload:**
+
+| Campo | Tipo     | Requerido | Validación              |
+|-------|----------|-----------|-------------------------|
+| `id`  | `number` | ✅ Sí     | Debe ser un número entero|
+
+**Ejemplo:**
+
+```json
+{ "id": 1 }
+```
+
+> No elimina el registro de la base de datos, solo marca `available: false`.

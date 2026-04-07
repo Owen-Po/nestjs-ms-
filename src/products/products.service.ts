@@ -19,7 +19,9 @@ export class ProductsService {
     const page = paginationDto.page ?? 1;
     const limit = paginationDto.limit ?? 10;
 
-    const totalProducts = await this.prisma.product.count({where: {available:true}});
+    const totalProducts = await this.prisma.product.count({
+      where: { available: true },
+    });
     const lastPage = Math.ceil(totalProducts / limit);
 
     return {
@@ -49,12 +51,14 @@ export class ProductsService {
   }
 
   async update(id: number, updateProductDto: UpdateProductDto) {
+    const { id: __, ...data } = updateProductDto;
+
     await this.findOne(id);
 
     // esto es para traer el producto por id
     return this.prisma.product.update({
       where: { id },
-      data: updateProductDto,
+      data: data,
     });
   }
 
