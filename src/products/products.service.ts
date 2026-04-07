@@ -3,6 +3,7 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { PrismaService } from 'src/prisma.service';
 import { PaginationDto } from '../common/dto/pagination.dto';
+import { product } from '../../dist/generated/prisma/browser';
 
 @Injectable()
 export class ProductsService {
@@ -48,11 +49,21 @@ export class ProductsService {
     return product;
   }
 
-  update(id: number, updateProductDto: UpdateProductDto) {
-    return `This action updates a #${id} product`;
+  async update(id: number, updateProductDto: UpdateProductDto) {
+    await this.findOne(id);
+
+    // esto es para traer el producto por id
+    return this.prisma.product.update({
+      where: { id },
+      data: updateProductDto,
+    });
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} product`;
+  async remove(id: number) {
+    await this.findOne(id);
+
+    return this.prisma.product.delete({
+      where: { id },
+    });
   }
 }
