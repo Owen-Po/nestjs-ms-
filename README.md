@@ -132,7 +132,6 @@ app.useGlobalPipes(
 
 7. Crear el `PrismaService` en `src/prisma.service.ts` siguiendo la documentación de NestJS + Prisma.
 
-
 8. Importar `PrismaService` en `ProductsModule` como provider:
 
    ```ts
@@ -165,7 +164,6 @@ app.useGlobalPipes(
    ```
 
    Esto usa Prisma para insertar un nuevo producto en la base de datos SQLite a partir del DTO validado.
-
 
 2. Probar con Postman que el endpoint `POST /products` crea productos correctamente.
 
@@ -277,3 +275,34 @@ Respuesta esperada:
 ```
 
 Si no se envían parámetros, usa `page=1` y `limit=10` por defecto.
+
+## Obtener producto por ID
+
+Este endpoint permite obtener un producto específico mediante su id.
+
+ Manejo de errores
+
+Cuando el cliente solicita un id que no existe en la base de datos, el sistema responde con una excepción 404 Not Found.
+Esto evita devolver valores nulos y proporciona una respuesta clara y profesional.
+
+- Implementación
+- Servicio
+
+async findOne(id: number) {
+  const product = await this.prisma.product.findUnique({
+    where: { id },
+  });
+
+  if (!product) {
+    throw new NotFoundException(`Product with id ${id} not found`);
+  }
+
+  return product;
+}
+
+## Controlador
+
+- @Get(':id')
+findOne(@Param('id', ParseIntPipe) id: number) {
+  return this.productsService.findOne(id);
+}
