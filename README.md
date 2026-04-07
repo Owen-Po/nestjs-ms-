@@ -133,5 +133,35 @@ app.useGlobalPipes(
 7. Crear el `PrismaService` en `src/prisma.service.ts` siguiendo la documentación de NestJS + Prisma.
 
 
-8. despues de crear el prisma service, vamos a importarlo en products modul 
-9. hacemos las inyectiones en proucts service
+8. Importar `PrismaService` en `ProductsModule` como provider:
+
+   ```ts
+   // src/products/products.module.ts
+   import { PrismaService } from 'src/prisma.service';
+
+   @Module({
+     providers: [ProductsService, PrismaService],
+   })
+   export class ProductsModule {}
+   ```
+
+### Paso 6 - Conectar el servicio de productos con Prisma
+
+1. Inyectar `PrismaService` en `ProductsService` y crear el método `create`:
+
+   ```ts
+   // src/products/products.service.ts
+   @Injectable()
+   export class ProductsService {
+     constructor(private prisma: PrismaService) {}
+
+     async create(createProductDto: CreateProductDto) {
+       const product = await this.prisma.product.create({
+         data: createProductDto,
+       });
+       return product;
+     }
+   }
+   ```
+
+   Esto usa Prisma para insertar un nuevo producto en la base de datos SQLite a partir del DTO validado.
