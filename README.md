@@ -276,18 +276,16 @@ Respuesta esperada:
 
 Si no se envían parámetros, usa `page=1` y `limit=10` por defecto.
 
-## Obtener producto por ID
+### Paso 8 - Obtener producto por ID
 
-Este endpoint permite obtener un producto específico mediante su id.
+Este endpoint permite obtener un producto específico mediante su `id`. Si el producto no existe, respondemos con un error `404 Not Found` en lugar de devolver `null`.
 
- Manejo de errores
+#### 8.1 - Servicio
 
-Cuando el cliente solicita un id que no existe en la base de datos, el sistema responde con una excepción 404 Not Found.
-Esto evita devolver valores nulos y proporciona una respuesta clara y profesional.
+En el servicio usamos `findUnique` de Prisma para buscar por `id`. Si no se encuentra, lanzamos una excepción de NestJS:
 
-- Implementación
-- Servicio
-
+```ts
+// src/products/products.service.ts
 async findOne(id: number) {
   const product = await this.prisma.product.findUnique({
     where: { id },
@@ -299,10 +297,275 @@ async findOne(id: number) {
 
   return product;
 }
+```
 
-## Controlador
+- `findUnique` busca un único registro por un campo único (en este caso `id`).
+- `NotFoundException` es una excepción integrada de NestJS que automáticamente responde con status `404` y un mensaje descriptivo.
 
-- @Get(':id')
+#### 8.2 - Controlador
+
+En el controlador usamos `@Param('id')` para extraer el parámetro de la URL y `ParseIntPipe` para convertirlo a número:
+
+```ts
+// src/products/products.controller.ts
+@Get(':id')
 findOne(@Param('id', ParseIntPipe) id: number) {
   return this.productsService.findOne(id);
 }
+```
+
+- `ParseIntPipe` convierte el string `"1"` de la URL a número `1`. Si el valor no es un número válido, NestJS responde automáticamente con un error `400 Bad Request`.
+
+#### 8.3 - Probar
+
+```bash
+GET http://localhost:3000/products/1
+```
+
+Si el producto existe devuelve el objeto, si no:
+
+```json
+{
+  "statusCode": 404,
+  "message": "Product with id 99 not found"
+}
+```
+
+---
+
+### Paso 9 - Actualizar producto por ID
+
+Este endpoint permite actualizar parcialmente un producto existente usando su `id`.
+
+#### 9.1 - DTO de actualización
+
+NestJS genera automáticamente `UpdateProductDto` extendiendo de `CreateProductDto` con `PartialType`, lo que hace que todos los campos sean opcionales:
+
+```ts
+// src/products/dto/update-product.dto.ts
+import { PartialType } from '@nestjs/mapped-types';
+import { CreateProductDto } from './create-product.dto';
+
+export class UpdateProductDto extends PartialType(CreateProductDto) {}
+```
+
+- `PartialType` toma el DTO original y convierte todos los campos a opcionales. Así puedes enviar solo los campos que deseas actualizar.
+
+#### 9.2 - Servicio
+
+En el servicio primero verificamos que el producto exista (reutilizando `findOne`) y luego lo actualizamos:
+
+```ts
+// src/products/products.service.ts
+async update(id: number, updateProductDto: UpdateProductDto) {
+  await this.findOne(id);
+
+  return this.prisma.product.update({
+    where: { id },
+    data: updateProductDto,
+  });
+}
+```
+
+- Llamamos a `this.findOne(id)` antes de actualizar. Si el producto no existe, `findOne` ya lanza el error `404` automáticamente, así no duplicamos lógica.
+- `prisma.product.update` actualiza solo los campos que vienen en el DTO.
+
+#### 9.3 - Controlador
+
+Usamos el decorador `@Patch(':id')` para recibir actualizaciones parciales:
+
+```ts
+// src/products/products.controller.ts
+@Patch(':id')
+update(
+  @Param('id', ParseIntPipe) id: number,
+  @Body() updateProductDto: UpdateProductDto,
+) {
+  return this.productsService.update(id, updateProductDto);
+}
+```
+
+- Usamos `PATCH` en lugar de `PUT` porque estamos haciendo una actualización parcial (no reemplazamos todo el recurso).
+
+#### 9.4 - Probar
+
+```bash
+PATCH http://localhost:3000/products/1
+Content-Type: application/json
+
+{
+  "price": 29.99
+}
+```
+
+Esto actualiza solo el precio del producto con `id: 1`, dejando el resto de campos intactos.
+
+---
+
+### Paso 10 - Eliminar producto por ID
+
+Inicialmente podemos implementar una eliminación física (borrar el registro de la base de datos):
+
+#### 10.1 - Servicio (eliminación física)
+
+```ts
+// src/products/products.service.ts
+async remove(id: number) {
+  await this.findOne(id);
+
+  return this.prisma.product.delete({
+    where: { id },
+  });
+}
+```
+
+#### 10.2 - Controlador
+
+```ts
+// src/products/products.controller.ts
+@Delete(':id')
+remove(@Param('id', ParseIntPipe) id: number) {
+  return this.productsService.remove(id);
+}
+```
+
+#### 10.3 - Probar
+
+```bash
+DELETE http://localhost:3000/products/1
+```
+
+Esto elimina permanentemente el producto. Pero en la práctica esto no es ideal, ya que perdemos el historial. Por eso implementamos la **eliminación suave** en el siguiente paso.
+
+---
+
+### Paso 11 - Eliminación suave (Soft Delete) con `available`
+
+En lugar de borrar registros de la base de datos, marcamos los productos como "no disponibles". Esto nos permite mantener el historial y recuperar productos si es necesario.
+
+#### 11.1 - Agregar el campo `available` al schema de Prisma
+
+Abrimos `prisma/schema.prisma` y agregamos el campo `available` al modelo:
+
+```prisma
+model product {
+  id        Int      @id @default(autoincrement())
+  name      String   @unique
+  price     Float
+
+  available Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updateAt  DateTime @updatedAt
+}
+```
+
+- `@default(true)` — todos los productos nuevos se crean como disponibles por defecto.
+
+#### 11.2 - Ejecutar la migración
+
+```bash
+npx prisma migrate dev --name available
+```
+
+Esto crea una migración que agrega la columna `available` a la tabla existente con valor por defecto `true`, sin perder datos.
+
+#### 11.3 - Modificar `remove` para hacer soft delete
+
+En lugar de usar `delete`, ahora usamos `update` para cambiar `available` a `false`:
+
+```ts
+// src/products/products.service.ts
+async remove(id: number) {
+  await this.findOne(id);
+
+  const product = await this.prisma.product.update({
+    where: { id },
+    data: { available: false },
+  });
+  return product;
+}
+```
+
+- El producto sigue existiendo en la base de datos, pero con `available: false`.
+
+#### 11.4 - Filtrar productos eliminados en las consultas
+
+Ahora debemos asegurarnos de que los productos "eliminados" no aparezcan en las consultas. Actualizamos `findOne` y `findAll`:
+
+```ts
+// src/products/products.service.ts
+
+// En findOne agregamos available: true al where
+async findOne(id: number) {
+  const product = await this.prisma.product.findUnique({
+    where: { id, available: true },
+  });
+
+  if (!product) {
+    throw new NotFoundException(`Product with id ${id} not found`);
+  }
+
+  return product;
+}
+
+// En findAll filtramos solo productos disponibles
+async findAll(paginationDto: PaginationDto) {
+  const page = paginationDto.page ?? 1;
+  const limit = paginationDto.limit ?? 10;
+
+  const totalProducts = await this.prisma.product.count({
+    where: { available: true },
+  });
+  const lastPage = Math.ceil(totalProducts / limit);
+
+  return {
+    data: await this.prisma.product.findMany({
+      skip: (page - 1) * limit,
+      take: limit,
+      where: { available: true },
+    }),
+    meta: {
+      total: totalProducts,
+      page,
+      lastPage,
+    },
+  };
+}
+```
+
+- Agregamos `where: { available: true }` tanto en `count` como en `findMany` para que la paginación solo cuente y devuelva productos disponibles.
+- En `findOne` agregamos `available: true` al `where`, así si un producto fue "eliminado", `findOne` lo trata como si no existiera y lanza `404`.
+
+#### 11.5 - Probar
+
+1. Crear un producto:
+
+   ```bash
+   POST http://localhost:3000/products
+   { "name": "Laptop", "price": 999.99 }
+   ```
+
+2. "Eliminarlo":
+
+   ```bash
+   DELETE http://localhost:3000/products/1
+   ```
+
+   Respuesta: el producto con `available: false`.
+
+3. Intentar obtenerlo:
+
+   ```bash
+   GET http://localhost:3000/products/1
+   ```
+
+   Respuesta: `404 Not Found` — el producto ya no es visible.
+
+4. Listar productos:
+
+   ```bash
+   GET http://localhost:3000/products
+   ```
+
+   El producto eliminado no aparece en la lista.
