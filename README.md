@@ -1,113 +1,61 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Products Microservice
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+Microservicio de productos construido con [NestJS](https://nestjs.com/), Prisma y SQLite.
 
-## Description
+## Tecnologías
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+- **NestJS** v11
+- **Prisma** con SQLite
+- **class-validator / class-transformer** para validación de DTOs
+- **dotenv + Joi** para variables de entorno
 
-## Project setup
+---
+
+## Instalación
 
 ```bash
 npm install
 ```
 
-## Compile and run the project
+## Ejecución
 
 ```bash
-# development
-$ npm run start
+# desarrollo (watch mode)
+npm run start:dev
 
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+# producción
+npm run start:prod
 ```
 
-## Run tests
+---
+
+## Pasos de construcción del proyecto
+
+### Paso 1 - Crear el proyecto
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+nest new products-ms
 ```
 
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+### Paso 2 - Generar el recurso de productos
 
 ```bash
-npm install -g @nestjs/mau
-mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
-
------------------------------------------------------
-
-## Despues de la creacion del proyecto
-
-# en la terminal
-
 nest g res products --no-spec
+```
 
-## despues de corregir los dtos y entityrs
+Esto genera automáticamente el módulo, controlador, servicio, DTOs y entities de productos.
 
-isntalar ñas dependencias : npm install class-validator class-transformer
+### Paso 3 - Configurar DTOs y validaciones
 
- Ahora que ya instalaste las librerías, normalmente debes activar validación global en tu main.ts:
+Instalar las dependencias de validación:
 
+```bash
+npm install class-validator class-transformer
+```
+
+Activar la validación global en `main.ts`:
+
+```ts
 import { ValidationPipe } from '@nestjs/common';
 
 app.useGlobalPipes(
@@ -116,26 +64,74 @@ app.useGlobalPipes(
     forbidNonWhitelisted: true,
   }),
 );
+```
 
-## una vez modificado todo
+### Paso 4 - Variables de entorno
 
--Comenzaremos con variables de entorno ('.env')
+1. Instalar dependencias:
 
-- Primero vamos a crear la carpeta 'config' en el src despues creamos el archivo 'envs.ts'
-- segundo fuera del proyecto creamos nuestro .env , escribimos el port , desspues creamos otro de ejemplo
-- tercero ahora vamos a instalar el 'npm i dotenv joi'
-- cuarto configuramos el archivo envs.ts , despues en main.ts cambiamos el puerto por el envs.ts
+   ```bash
+   npm i dotenv joi
+   ```
 
-## Terminando de modificar las variables de entorno vamos al siguiente paso
+2. Crear la carpeta `src/config` y el archivo `envs.ts`.
+3. Crear el archivo `.env` en la raíz del proyecto con el puerto y demás variables. Crear también un `.env.example`.
+4. Configurar `envs.ts` con Joi para validar las variables y actualizar `main.ts` para usar el puerto desde `envs.ts`.
 
-- Usaremos 'Prisma' con sql lite ( npm install prisma --save-dev)
-- segundo vamos con prisma ('npx prisma init)
-- Tercero modificamos el archivo schema.prims incorporando :
-  " generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
-  moduleFormat = "cjs"
-}"
-- cuarto cofnigruamos el env. con el url de prisma , despues creamos el modelo que esta en su libreira .
-- quinto creamos un modal que esta tambien el la libreria nest y despues de implementar el model instalaremos la migracion  
-'npx prisma migrate dev --name init'  
+### Paso 5 - Prisma con SQLite
+
+1. Instalar Prisma como dependencia de desarrollo:
+
+   ```bash
+   npm install prisma --save-dev
+   ```
+
+2. Inicializar Prisma:
+
+   ```bash
+   npx prisma init
+   ```
+
+3. Modificar `prisma/schema.prisma` con el generador y el modelo de producto:
+
+   ```prisma
+   generator client {
+     provider     = "prisma-client"
+     output       = "../generated/prisma"
+     moduleFormat = "cjs"
+   }
+
+   datasource db {
+     provider = "sqlite"
+   }
+
+   model product {
+     id        Int      @id @default(autoincrement())
+     name      String   @unique
+     price     Float
+     createdAt DateTime @default(now())
+     updateAt  DateTime @updatedAt
+   }
+   ```
+
+4. Configurar el `.env` con la URL de la base de datos de Prisma.
+
+5. Ejecutar la migración, instalar el cliente y generar los tipos:
+
+   ```bash
+   npx prisma migrate dev --name init
+   npm install @prisma/client
+   npx prisma generate
+   ```
+
+6. Instalar el adaptador de SQLite:
+
+   ```bash
+   npm install @prisma/adapter-better-sqlite3
+   ```
+
+7. Crear el `PrismaService` en `src/prisma.service.ts` siguiendo la documentación de NestJS + Prisma.
+
+
+8. despues de crear el prisma service, vamos a importarlo en products modul 
+9. hacemos las inyectiones en proucts service

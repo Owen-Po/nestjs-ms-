@@ -21,6 +21,6 @@ model product {
   name String @unique
   price Float 
   createdAt DateTime @default(now())
-  updateAt DateTime @updateAt
+  updateAt DateTime @updatedAt
 
 }
